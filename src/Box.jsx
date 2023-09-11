@@ -6,7 +6,8 @@ import {
   shadow,
   typography,
   flexbox,
-  border
+  border,
+  grid
 } from 'styled-system';
 
 export const Box = styled('div')(
@@ -15,5 +16,5 @@ export const Box = styled('div')(
   layout,
   shadow,
   typography,
-  flexbox, border
+  flexbox, border,grid
 );
