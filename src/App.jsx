@@ -1,62 +1,54 @@
 import { Box } from './Box';
 import SearchBar from 'ImageFinder/search/Searchbar';
-import React, { Component } from 'react';
 import { Vortex } from 'react-loader-spinner';
-
-// import PropTypes from 'prop-types';
-
 import { ToastContainer, toast } from 'react-toastify';
 import { ImageGallery } from 'ImageFinder/img-gallery/ImageGallery';
 import fetchPictures from 'ImageFinder/services/fetchImg';
 import LoadMoreButton from 'ImageFinder/loadMore/LoadMoreButton';
 import Modal from 'ImageFinder/Modal/Modal';
-
 import 'react-toastify/dist/ReactToastify.css';
 import { ImageView } from 'ImageFinder/Modal/ImageView';
+import { useState, useEffect } from 'react';
 
-class App extends Component {
-  state = {
-    searchQuery: '',
-    images: [],
-    page: 1,
-    selectedImg: null,
-    status: 'idle',
-    alt: null,
-  };
+const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [selectedImg, setSelectedImg] = useState(null);
+  const [status, setStatus] = useState('idle');
+  const [alt, setAlt] = useState(null);
+  const [totalHits, setTotalHits] = useState(null);
 
-  totalHits = null;
+  const submitForm = (values, { resetForm }) => {
+    const searchQueryNew = values.searchQuery.toLowerCase();
 
-  submitForm = (values, { resetForm }) => {
-    const searchQuery = values.searchQuery.toLowerCase();
-
-    if (this.state.searchQuery === searchQuery) {
+    if (searchQuery === searchQueryNew) {
       return;
     }
 
-    this.setState({ searchQuery });
+    setSearchQuery(searchQueryNew);
     resetForm();
-    this.resetState();
+    resetState();
   };
 
-  resetState = () => {
-    this.setState({
-      page: 1,
-      images: [],
-      selectedImage: null,
-      alt: null,
-      status: 'pending',
-    });
+  const resetState = () => {
+    setImages([]);
+    setPage(1);
+    setStatus('idle');
+
+    setTotalHits(null);
   };
 
-  async componentDidUpdate(_, prevState) {
-    const { page, searchQuery } = this.state;
-    if (prevState.searchQuery !== searchQuery || prevState.page !== page) {
-      this.setState({ status: 'pending' });
-
+  useEffect(() => {
+    if (!searchQuery) {
+      return;
+    }
+    async function fetchImages() {
+      setStatus('pending');
       try {
         const imageData = await fetchPictures(searchQuery, page);
+        setTotalHits(imageData.total);
 
-        this.totalHits = imageData.total;
         const imagesHits = imageData.hits;
         if (!imagesHits.length) {
           toast.warning(
@@ -64,13 +56,11 @@ class App extends Component {
             { position: 'top-center' }
           );
         }
-        this.setState(({ images }) => ({
-          images: [...images, ...imagesHits],
-          status: 'resolved',
-        }));
+        setStatus('resolved');
+        setImages(images => [...images, ...imagesHits]);
 
         if (page > 1) {
-          const CARD_HEIGHT = 300; // preview image height
+          const CARD_HEIGHT = 300;
           window.scrollBy({
             top: CARD_HEIGHT * 2,
             behavior: 'smooth',
@@ -78,70 +68,58 @@ class App extends Component {
         }
       } catch (error) {
         toast.error(`Sorry something went wrong.`);
-        this.setState({ status: 'rejected' });
+        setStatus('rejected');
       }
     }
-  }
 
-  loadMore = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
+    fetchImages();
+  }, [page, searchQuery]);
+
+  const loadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  handleSelectImg = (largeImageURL, tags) => {
-    this.setState({ selectedImg: largeImageURL, alt: tags });
+  const handleSelectImg = (largeImageURL, tags) => {
+    setSelectedImg(largeImageURL);
+    setAlt(tags);
   };
 
-  toggleModal = () => {
-    this.setState(({ selectedImg }) => ({
-      selectedImg: !selectedImg,
-    }));
+  const toggleModal = () => {
+    setSelectedImg(null);
   };
 
-  render() {
-    // const { showModal } = this.state;
-    const { images, status, selectedImg, alt} = this.state;
-    console.log(this.state);
-
-    return (
-      <Box
-        as="div"
-        display="grid"
-        grid-template-columns="1fr"
-        grid-gap="16"
-        padding-bottom="32px"
-      >
-        <SearchBar submitForm={this.submitForm} />
-        {images.length > 0 && (
-          <ImageGallery images={images} selectedImg={this.handleSelectImg} />
-        )}
-        <Vortex
-          visible={status === 'pending'}
-          height="180"
-          width="180"
-          ariaLabel="vortex-loading"
-          wrapperStyle={{ margin: 'auto' }}
-          wrapperClass="vortex-wrapper"
-          colors={['red', 'green', 'blue', 'yellow', 'orange', 'purple']}
-        />
-        {images.length > 0 && images.length !== this.totalHits && (
-          <LoadMoreButton onClick={this.loadMore} />
-        )}
-        <ToastContainer autoClose="3000" />
-        {selectedImg && (
-          // <Modal
-          //   onClose={this.toggleModal}
-          //   selectedImg={selectedImg}
-          //   tags={alt}
-          // />
-          <Modal onClose={this.toggleModal}>
-            <ImageView selectedImg={selectedImg} tags={alt} />
-          </Modal>
-        )}
-      </Box>
-    );
-  }
-}
+  return (
+    <Box
+      as="div"
+      display="grid"
+      grid-template-columns="1fr"
+      grid-gap="16"
+      padding-bottom="32px"
+    >
+      <SearchBar submitForm={submitForm} />
+      {images.length > 0 && (
+        <ImageGallery images={images} selectedImg={handleSelectImg} />
+      )}
+      <Vortex
+        visible={status === 'pending'}
+        height="180"
+        width="180"
+        ariaLabel="vortex-loading"
+        wrapperStyle={{ margin: 'auto' }}
+        wrapperClass="vortex-wrapper"
+        colors={['red', 'green', 'blue', 'yellow', 'orange', 'purple']}
+      />
+      {images.length > 0 && images.length !== totalHits && (
+        <LoadMoreButton onClick={loadMore} />
+      )}
+      <ToastContainer autoClose="3000" />
+      {selectedImg && (
+        <Modal onClose={toggleModal}>
+          <ImageView selectedImg={selectedImg} tags={alt} />
+        </Modal>
+      )}
+    </Box>
+  );
+};
 
 export default App;
